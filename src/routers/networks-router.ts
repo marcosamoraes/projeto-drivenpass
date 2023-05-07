@@ -1,8 +1,8 @@
 import { Router } from 'express';
 
 import { authenticateToken, validateBody } from '@/middlewares';
-import { createNetworkSchema } from '@/schemas/networks-schemas';
-import { networksDestroy, networksList, networksShow, networksStore } from '@/controllers/networks-controller';
+import { createNetworkSchema } from '@/schemas';
+import { networksDestroy, networksList, networksShow, networksStore } from '@/controllers';
 
 const networksRouter = Router();
 

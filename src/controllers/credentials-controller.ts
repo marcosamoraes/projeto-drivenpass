@@ -33,7 +33,7 @@ export async function credentialsStore(req: AuthenticatedRequest, res: Response)
   try {
     const credential = await credentialService.createCredential({ userId, title, url, username, password });
     return res.status(httpStatus.CREATED).json({
-      id: credential.id,
+      credentialId: credential.id,
     });
   } catch (error) {
     if (error.name === 'DuplicatedTitleError') {
@@ -49,7 +49,7 @@ export async function credentialsDestroy(req: AuthenticatedRequest, res: Respons
 
   try {
     await credentialService.destroyCredential(userId, parseInt(credentialId));
-    return res.status(httpStatus.ACCEPTED);
+    return res.sendStatus(httpStatus.ACCEPTED);
   } catch (error) {
     next(error);
   }

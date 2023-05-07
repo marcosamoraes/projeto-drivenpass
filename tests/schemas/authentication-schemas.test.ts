@@ -2,9 +2,9 @@ import faker from '@faker-js/faker';
 import { signInSchema } from '@/schemas';
 
 describe('signInSchema', () => {
-  const generateValidInput = () => ({
+  const generateValidInput = (passwordLenght = 10) => ({
     email: faker.internet.email(),
-    password: faker.internet.password(6),
+    password: faker.internet.password(passwordLenght),
   });
 
   describe('when email is not valid', () => {
@@ -28,6 +28,15 @@ describe('signInSchema', () => {
   });
 
   describe('when password is not valid', () => {
+    it('should return error if password has less then 10 characters', () => {
+      const input = generateValidInput(6);
+      delete input.password;
+
+      const { error } = signInSchema.validate(input);
+
+      expect(error).toBeDefined();
+    });
+
     it('should return error if password is not present', () => {
       const input = generateValidInput();
       delete input.password;

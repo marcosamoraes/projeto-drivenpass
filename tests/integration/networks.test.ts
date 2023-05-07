@@ -1,11 +1,12 @@
 import { faker } from '@faker-js/faker';
 import httpStatus from 'http-status';
 import supertest from 'supertest';
+import * as jwt from 'jsonwebtoken';
 import { createUser } from '../factories';
-import { cleanDb } from '../helpers';
-import { duplicatedEmailError } from '@/services/users-service';
-import { prisma } from '@/config';
+import { cleanDb, generateValidToken } from '../helpers';
+import { createNetwork } from '../factories/networks-factory';
 import app, { init } from '@/app';
+import { cryptrUtil } from '@/utils/cryptr-utils';
 
 beforeAll(async () => {
   await init();
@@ -14,71 +15,252 @@ beforeAll(async () => {
 
 const server = supertest(app);
 
-describe('POST /users', () => {
-  it('should respond with status 400 when body is not given', async () => {
-    const response = await server.post('/users');
+describe('GET /networks', () => {
+  it('should respond with status 401 if no token is given', async () => {
+    const response = await server.get('/networks');
 
-    expect(response.status).toBe(httpStatus.BAD_REQUEST);
+    expect(response.status).toBe(httpStatus.UNAUTHORIZED);
   });
 
-  it('should respond with status 400 when body is not valid', async () => {
-    const invalidBody = { [faker.lorem.word()]: faker.lorem.word() };
+  it('should respond with status 401 if given token is not valid', async () => {
+    const token = faker.lorem.word();
 
-    const response = await server.post('/users').send(invalidBody);
+    const response = await server.get('/networks').set('Authorization', `Bearer ${token}`);
 
-    expect(response.status).toBe(httpStatus.BAD_REQUEST);
+    expect(response.status).toBe(httpStatus.UNAUTHORIZED);
   });
 
-  describe('when body is valid', () => {
-    const generateValidBody = () => ({
-      email: faker.internet.email(),
-      password: faker.internet.password(6),
+  it('should respond with status 401 if there is no session for given token', async () => {
+    const userWithoutSession = await createUser();
+    const token = jwt.sign({ userId: userWithoutSession.id }, process.env.JWT_SECRET);
+
+    const response = await server.get('/networks').set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(httpStatus.UNAUTHORIZED);
+  });
+
+  describe('when token is valid', () => {
+    it('should respond with status 404 when user has no networks', async () => {
+      const user = await createUser();
+      const token = await generateValidToken(user);
+
+      const response = await server.get('/networks').set('Authorization', `Bearer ${token}`);
+      expect(response.status).toEqual(httpStatus.NOT_FOUND);
     });
 
-    it('should respond with status 409 when there is an user with given email', async () => {
-      const body = generateValidBody();
-      await createUser(body);
+    it('should respond with status 200 and the networks', async () => {
+      const user = await createUser();
+      const token = await generateValidToken(user);
 
-      const response = await server.post('/users').send(body);
+      const network1 = await createNetwork(user);
+      const network2 = await createNetwork(user);
 
-      expect(response.status).toBe(httpStatus.CONFLICT);
-      expect(response.body).toEqual(duplicatedEmailError());
+      const response = await server.get('/networks').set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toEqual(httpStatus.OK);
+
+      expect(response.body).toEqual([
+        {
+          ...network1,
+          password: cryptrUtil.decrypt(network1.password),
+        },
+        {
+          ...network2,
+          password: cryptrUtil.decrypt(network2.password),
+        },
+      ]);
+    });
+  });
+});
+
+describe('GET /networks/:networkId', () => {
+  it('should respond with status 401 if no token is given', async () => {
+    const response = await server.get('/networks');
+
+    expect(response.status).toBe(httpStatus.UNAUTHORIZED);
+  });
+
+  it('should respond with status 401 if given token is not valid', async () => {
+    const token = faker.lorem.word();
+
+    const response = await server.get('/networks').set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(httpStatus.UNAUTHORIZED);
+  });
+
+  it('should respond with status 401 if there is no session for given token', async () => {
+    const userWithoutSession = await createUser();
+    const token = jwt.sign({ userId: userWithoutSession.id }, process.env.JWT_SECRET);
+
+    const response = await server.get('/networks').set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(httpStatus.UNAUTHORIZED);
+  });
+
+  describe('when token is valid', () => {
+    it('should respond with status 404 when user has no networks', async () => {
+      const user = await createUser();
+      const token = await generateValidToken(user);
+
+      const response = await server.get('/networks').set('Authorization', `Bearer ${token}`);
+      expect(response.status).toEqual(httpStatus.NOT_FOUND);
     });
 
-    it('should respond with status 201 and create user when given email is unique', async () => {
-      const body = generateValidBody();
+    it('should respond with status 404 when network doesnt belongs to user', async () => {
+      const user = await createUser();
+      const token = await generateValidToken(user);
 
-      const response = await server.post('/users').send(body);
+      const otherUser = await createUser();
 
-      expect(response.status).toBe(httpStatus.CREATED);
+      const network = await createNetwork(otherUser);
+
+      const response = await server.get(`/networks/${network.id}`).set('Authorization', `Bearer ${token}`);
+      expect(response.status).toEqual(httpStatus.NOT_FOUND);
+    });
+
+    it('should respond with status 200 and the network', async () => {
+      const user = await createUser();
+      const token = await generateValidToken(user);
+
+      const network = await createNetwork(user);
+
+      const response = await server.get(`/networks/${network.id}`).set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toEqual(httpStatus.OK);
+
       expect(response.body).toEqual({
-        id: expect.any(Number),
-        email: body.email,
+        ...network,
+        password: cryptrUtil.decrypt(network.password),
       });
     });
+  });
+});
 
-    it('should not return user password on body', async () => {
-      const body = generateValidBody();
+describe('POST /networks', () => {
+  const generateValidBody = () => ({
+    title: faker.lorem.sentence(),
+    network: faker.lorem.sentence(),
+    password: faker.internet.password(),
+  });
 
-      const response = await server.post('/users').send(body);
+  it('should respond with status 401 if no token is given', async () => {
+    const network = generateValidBody();
+    const response = await server.post('/networks').send({ ...network });
 
-      expect(response.body).not.toHaveProperty('password');
+    expect(response.status).toBe(httpStatus.UNAUTHORIZED);
+  });
+
+  it('should respond with status 401 if given token is not valid', async () => {
+    const token = faker.lorem.word();
+    const network = generateValidBody();
+
+    const response = await server
+      .post('/networks')
+      .send({ ...network })
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(httpStatus.UNAUTHORIZED);
+  });
+
+  it('should respond with status 401 if there is no session for given token', async () => {
+    const userWithoutSession = await createUser();
+    const token = jwt.sign({ userId: userWithoutSession.id }, process.env.JWT_SECRET);
+    const network = generateValidBody();
+
+    const response = await server
+      .post('/networks')
+      .send({ ...network })
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(httpStatus.UNAUTHORIZED);
+  });
+
+  it('should respond with status 409 if exists other network with the same title.', async () => {
+    const user = await createUser();
+    const token = await generateValidToken(user);
+    const network = generateValidBody();
+
+    const network2 = await createNetwork(user);
+
+    network.title = network2.title;
+
+    const response = await server
+      .post(`/networks`)
+      .send({ ...network })
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(httpStatus.CONFLICT);
+  });
+
+  it('should respond with status 201 and networkId when the user send the right data.', async () => {
+    const user = await createUser();
+    const token = await generateValidToken(user);
+    const network = generateValidBody();
+
+    const response = await server
+      .post(`/networks`)
+      .send({ ...network })
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(httpStatus.CREATED);
+    expect(response.body).toEqual({
+      networkId: expect.any(Number),
     });
+  });
+});
 
-    it('should save user on db', async () => {
-      const body = generateValidBody();
+describe('DELETE /networks/:networkId', () => {
+  it('should respond with status 401 if no token is given', async () => {
+    const network = await createNetwork();
+    const response = await server.delete(`/networks/${network.id}`);
 
-      const response = await server.post('/users').send(body);
+    expect(response.status).toBe(httpStatus.UNAUTHORIZED);
+  });
 
-      const user = await prisma.user.findUnique({
-        where: { email: body.email },
-      });
-      expect(user).toEqual(
-        expect.objectContaining({
-          id: response.body.id,
-          email: body.email,
-        }),
-      );
-    });
+  it('should respond with status 401 if given token is not valid', async () => {
+    const token = faker.lorem.word();
+    const network = await createNetwork();
+
+    const response = await server.delete(`/networks/${network.id}`).set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(httpStatus.UNAUTHORIZED);
+  });
+
+  it('should respond with status 401 if there is no session for given token', async () => {
+    const userWithoutSession = await createUser();
+    const token = jwt.sign({ userId: userWithoutSession.id }, process.env.JWT_SECRET);
+    const network = await createNetwork();
+
+    const response = await server.delete(`/networks/${network.id}`).set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(httpStatus.UNAUTHORIZED);
+  });
+
+  it('should respond with status 404 if the network doesnt exists', async () => {
+    const user = await createUser();
+    const token = await generateValidToken(user);
+
+    const response = await server.delete(`/networks/1`).set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(httpStatus.NOT_FOUND);
+  });
+
+  it('should respond with status 404 if the network exists, but doesnt belongs to user', async () => {
+    const user = await createUser();
+    const token = await generateValidToken(user);
+    const network = await createNetwork();
+
+    const response = await server.delete(`/networks/${network.id}`).set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(httpStatus.NOT_FOUND);
+  });
+
+  it('should respond with status 202 when the user send the right data.', async () => {
+    const user = await createUser();
+    const token = await generateValidToken(user);
+    const network = await createNetwork(user);
+
+    const response = await server.delete(`/networks/${network.id}`).set('Authorization', `Bearer ${token}`);
+    expect(response.status).toBe(httpStatus.ACCEPTED);
   });
 });

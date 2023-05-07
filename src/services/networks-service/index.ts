@@ -1,11 +1,13 @@
 import { Network } from '@prisma/client';
-import { DuplicatedTitleError } from './errors';
 import networkRepository from '@/repositories/network-repository';
 import { cryptrUtil } from '@/utils/cryptr-utils';
-import { notFoundError } from '@/errors';
+import { DuplicatedTitleError, notFoundError } from '@/errors';
 
 async function listNetwork(userId: number) {
   const networks = await networkRepository.listNetwork(userId);
+  if (networks.length === 0) {
+    throw notFoundError();
+  }
 
   networks.map((network) => (network.password = cryptrUtil.decrypt(network.password)));
   return networks;
@@ -58,5 +60,4 @@ const networkService = {
   destroyNetwork,
 };
 
-export * from './errors';
 export default networkService;

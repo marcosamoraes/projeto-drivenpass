@@ -28,9 +28,17 @@ describe('POST /auth/sign-in', () => {
   });
 
   describe('when body is valid', () => {
-    const generateValidBody = () => ({
+    const generateValidBody = (passwordLength = 10) => ({
       email: faker.internet.email(),
-      password: faker.internet.password(6),
+      password: faker.internet.password(passwordLength),
+    });
+
+    it('should respond with status 400 if the password has less than 10 characters', async () => {
+      const body = generateValidBody(6);
+
+      const response = await server.post('/auth/sign-in').send(body);
+
+      expect(response.status).toBe(httpStatus.BAD_REQUEST);
     });
 
     it('should respond with status 401 if there is no user for given email', async () => {
@@ -47,7 +55,7 @@ describe('POST /auth/sign-in', () => {
 
       const response = await server.post('/auth/sign-in').send({
         ...body,
-        password: faker.lorem.word(),
+        password: faker.lorem.word(10),
       });
 
       expect(response.status).toBe(httpStatus.UNAUTHORIZED);

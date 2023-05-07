@@ -1,13 +1,8 @@
 import { Router } from 'express';
 
 import { authenticateToken, validateBody } from '@/middlewares';
-import { createCredentialSchema } from '@/schemas/credentials-schemas';
-import {
-  credentialsDestroy,
-  credentialsList,
-  credentialsShow,
-  credentialsStore,
-} from '@/controllers/credentials-controller';
+import { createCredentialSchema } from '@/schemas';
+import { credentialsDestroy, credentialsList, credentialsShow, credentialsStore } from '@/controllers';
 
 const credentialsRouter = Router();
 

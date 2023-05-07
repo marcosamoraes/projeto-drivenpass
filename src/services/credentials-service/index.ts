@@ -1,11 +1,13 @@
 import { Credential } from '@prisma/client';
-import { DuplicatedTitleError } from './errors';
 import credentialRepository from '@/repositories/credential-repository';
 import { cryptrUtil } from '@/utils/cryptr-utils';
-import { notFoundError } from '@/errors';
+import { DuplicatedTitleError, notFoundError } from '@/errors';
 
 async function listCredential(userId: number) {
   const credentials = await credentialRepository.listCredential(userId);
+  if (credentials.length === 0) {
+    throw notFoundError();
+  }
 
   credentials.map((credential) => (credential.password = cryptrUtil.decrypt(credential.password)));
   return credentials;
@@ -65,5 +67,4 @@ const credentialService = {
   destroyCredential,
 };
 
-export * from './errors';
 export default credentialService;

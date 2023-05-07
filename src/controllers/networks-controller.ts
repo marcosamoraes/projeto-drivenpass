@@ -33,7 +33,7 @@ export async function networksStore(req: AuthenticatedRequest, res: Response) {
   try {
     const response = await networkService.createNetwork({ userId, title, network, password });
     return res.status(httpStatus.CREATED).json({
-      id: response.id,
+      networkId: response.id,
     });
   } catch (error) {
     if (error.name === 'DuplicatedTitleError') {
@@ -49,7 +49,7 @@ export async function networksDestroy(req: AuthenticatedRequest, res: Response, 
 
   try {
     await networkService.destroyNetwork(userId, parseInt(networkId));
-    return res.status(httpStatus.ACCEPTED);
+    return res.sendStatus(httpStatus.ACCEPTED);
   } catch (error) {
     next(error);
   }
