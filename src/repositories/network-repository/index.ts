@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/config';
 
 async function findById(id: number, select?: Prisma.UserSelect) {
-  const params: Prisma.CredentialFindUniqueArgs = {
+  const params: Prisma.NetworkFindUniqueArgs = {
     where: {
       id,
     },
@@ -12,11 +12,11 @@ async function findById(id: number, select?: Prisma.UserSelect) {
     params.select = select;
   }
 
-  return prisma.credential.findUnique(params);
+  return prisma.network.findUnique(params);
 }
 
 async function findByTitle(userId: number, title: string) {
-  return prisma.credential.findFirst({
+  return prisma.network.findFirst({
     where: {
       userId,
       title,
@@ -24,34 +24,34 @@ async function findByTitle(userId: number, title: string) {
   });
 }
 
-async function listCredential(userId: number) {
-  return prisma.credential.findMany({
+async function listNetwork(userId: number) {
+  return prisma.network.findMany({
     where: {
       userId,
     },
   });
 }
 
-async function create(data: Prisma.CredentialUncheckedCreateInput) {
-  return prisma.credential.create({
+async function create(data: Prisma.NetworkUncheckedCreateInput) {
+  return prisma.network.create({
     data,
   });
 }
 
 async function destroy(credentialId: number) {
-  return prisma.credential.delete({
+  return prisma.network.delete({
     where: {
       id: credentialId,
     },
   });
 }
 
-const credentialRepository = {
+const networkRepository = {
   findById,
   findByTitle,
-  listCredential,
+  listNetwork,
   create,
   destroy,
 };
 
-export default credentialRepository;
+export default networkRepository;

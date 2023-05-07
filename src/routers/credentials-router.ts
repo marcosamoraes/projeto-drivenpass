@@ -1,6 +1,5 @@
 import { Router } from 'express';
 
-import { createUserSchema } from '@/schemas';
 import { authenticateToken, validateBody } from '@/middlewares';
 import { createCredentialSchema } from '@/schemas/credentials-schemas';
 import {
@@ -16,6 +15,6 @@ credentialsRouter.all('/*', authenticateToken);
 credentialsRouter.get('/', credentialsList);
 credentialsRouter.get('/:credentialId', credentialsShow);
 credentialsRouter.post('/', validateBody(createCredentialSchema), credentialsStore);
-credentialsRouter.delete('/:credentialId', validateBody(createUserSchema), credentialsDestroy);
+credentialsRouter.delete('/:credentialId', credentialsDestroy);
 
 export { credentialsRouter };
